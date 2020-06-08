@@ -48,3 +48,13 @@ Tritium solves all of the issues mentioned above and more. User enumeration will
  -res          Continue a password spraying campaign
  -rf           Tritium Json file 
 ```
+
+## Under Development 
+
+Below are some of the functionalities being developed: 
+
+* Ability to capture ^C and save state if process was killed manuall 
+* Ability to randomly choose a set of DCs to auth against 
+* Jitter between authentication attempts 
+
+
