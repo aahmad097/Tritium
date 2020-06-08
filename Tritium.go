@@ -131,8 +131,10 @@ func kerbAuth(username string, relm string, pass string, domainController string
 
 	var retString string = "[" + DC + "]\t" + domain + "/" + username + ":" + password
 
+	/*
+		Formats the config per the RFC standard
+	 */
 	kcfg_str := fmt.Sprintf(KERB_FMT_STRING, domain, DC)
-	println("DBG! " + kcfg_str)
 
 	cfg, err := kconfig.NewConfigFromString(kcfg_str)
 
@@ -141,8 +143,8 @@ func kerbAuth(username string, relm string, pass string, domainController string
 
 	if err != nil {
 
-		if strings.Contains(err.Error(), "(37) KRB_AP_ERR_SKEW Clock skew") { // line 132 logic from Tylous's tool Talon
-			fmt.Println("The difference between the time on the Kerberos server and you is too great to continue")
+		if strings.Contains(err.Error(), "KRB_AP_ERR_SKEW") {
+			fmt.Println("[FATAL: Time delta between server and client too large]")
 
 		} else if strings.Contains(err.Error(), "KDC_ERR_PREAUTH_FAILED") {
 			retString += "\t [Valid User But Invalid Password]"
