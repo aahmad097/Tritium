@@ -25,7 +25,7 @@ Tritium solves all of the issues mentioned above and more. User enumeration will
           |____|   |__|  |__||__| |__|____/|__|_|__/ v 0.1
                                                                                           
 
-          Author: S4R1N
+          Author: S4R1N, alfarom256
  
 
 
