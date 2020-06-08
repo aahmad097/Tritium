@@ -53,7 +53,7 @@ Tritium solves all of the issues mentioned above and more. User enumeration will
 
 Below are some of the functionalities being developed: 
 
-* Ability to capture ^C and save state if process was killed manuall 
+* Ability to capture ^C and save state if process was killed manually
 * Ability to randomly choose a set of DCs to auth against 
 * Jitter between authentication attempts 
 
