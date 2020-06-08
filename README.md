@@ -6,9 +6,10 @@ A tool to enumerate and spray valid Active Directory accounts through Kerberos P
 
 Although many kerberos password spraying tools currently exist on the market, I found it difficult to find tools with the following built-in functionality: 
 
+* The ability to prevent users from locking out the domain
+* The ability to integrate username enumeration with the password spraying process (User enumeration is a seperate functionality from the spray)
 * The ability to recursivly spray passwords rather than running one spray at a time 
 * The ability to resume password sprays and ignore perviously compromised accounts 
-* The ability to prevent users from locking out the domain
 
 Tritium solves all of the issues mentioned above and more. User enumeration will no longer waste a login attempt because it uses the output of the first spray to generate a file of valid users. Tritium also gives the user the ability to pass it a password file to recursively spray passwords. And Finally, Tritium has built in functionality to detect if a domain is being locked out due to password spraying by saving the state and quitting the password spray if 3 consecutive accounts are locked out. 
 
