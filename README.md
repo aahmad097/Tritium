@@ -4,7 +4,7 @@ A tool to enumerate and spray valid Active Directory accounts through Kerberos P
 
 ## Background
 
-Although many kerberos password spraying tools currently exist on the mark I found it difficult to find tools with the following built-in functionality: 
+Although many kerberos password spraying tools currently exist on the market, I found it difficult to find tools with the following built-in functionality: 
 
 * The ability to recursivly spray passwords rather than running one spray at a time 
 * The ability to resume password sprays and ignore perviously compromised accounts 
