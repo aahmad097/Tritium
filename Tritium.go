@@ -132,6 +132,7 @@ func kerbAuth(username string, relm string, pass string, domainController string
 	var retString string = "[" + DC + "]\t" + domain + "/" + username + ":" + password
 
 	kcfg_str := fmt.Sprintf(KERB_FMT_STRING, domain, DC)
+	println("DBG! " + kcfg_str)
 
 	cfg, err := kconfig.NewConfigFromString(kcfg_str)
 
