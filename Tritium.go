@@ -24,7 +24,7 @@ const (
 	  |____|   |__|  |__||__| |__|____/|__|_|__/ v 0.1
 											  
 
-	  Author: S4R1N
+	  Author: S4R1N, alfarom256
  `
 	usage = `
 
@@ -47,6 +47,15 @@ const (
  -res          Continue a password spraying campaign
  -rf           Tritium Json file 
  `
+
+	KERB_FMT_STRING = `[libdefaults]
+default_realm = ${REALM}
+dns_lookup_realm = false
+dns_lookup_kdc = true
+[realms]
+%s = {
+	kdc = %s
+}`
 )
 
 type FlagOptions struct { // option var decleration
@@ -122,7 +131,9 @@ func kerbAuth(username string, relm string, pass string, domainController string
 
 	var retString string = "[" + DC + "]\t" + domain + "/" + username + ":" + password
 
-	cfg, err := kconfig.NewConfigFromString("[libdefaults]\n         default_realm = ${REALM}\n        dns_lookup_realm = false\n         dns_lookup_kdc = true\n         [realms]\n          " + domain + " = {\n          kdc =" + DC + ":88\n          }\n")
+	kcfg_str := fmt.Sprintf(KERB_FMT_STRING, domain, DC)
+
+	cfg, err := kconfig.NewConfigFromString(kcfg_str)
 
 	cl := kclient.NewClientWithPassword(user, domain, password, cfg, kclient.DisablePAFXFAST(true))
 	err = cl.Login()
