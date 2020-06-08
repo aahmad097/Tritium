@@ -42,8 +42,8 @@ Tritium solves all of the issues mentioned above and more. User enumeration will
  -help         Print this help menu
  -o            Tritium Output file (default spray.json)
  -w            Wait time between authentication attempts [Default 1] (-w 0)          
- -rs           Enable recursive spraying [Default 3600] (-ws 1800)
- -ws           Wait time between sprays 
+ -rs           Enable recursive spraying 
+ -ws           Wait time between sprays [Default 3600] (-ws 1800)
  -pwf          Password file to use for recursive 
  -res          Continue a password spraying campaign
  -rf           Tritium Json file 
