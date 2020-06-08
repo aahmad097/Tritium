@@ -1,6 +1,6 @@
 # Tritium
 
-A tool to enumerate and spray valid Active Directory accounts through Kerberos Pre-Authentication
+A tool to enumerate and spray valid Active Directory accounts through Kerberos Pre-Authentication. This tool was inspired by the efforts of [Tylous](https://github.com/Tylous)
 
 ## Background
 
