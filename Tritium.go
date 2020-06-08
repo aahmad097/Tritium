@@ -129,7 +129,7 @@ func kerbAuth(username string, relm string, pass string, domainController string
 
 	if err != nil {
 
-		if strings.Contains(err.Error(), "(37) KRB_AP_ERR_SKEW Clock skew") { // logic from Tylous's tool Talon
+		if strings.Contains(err.Error(), "(37) KRB_AP_ERR_SKEW Clock skew") { // line 132 logic from Tylous's tool Talon
 			fmt.Println("The difference between the time on the Kerberos and you is too great to continue")
 
 		} else if strings.Contains(err.Error(), "KDC_ERR_PREAUTH_FAILED") {
