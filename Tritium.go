@@ -304,7 +304,6 @@ func recursiveSpray(uf string, realm string, pwf string, dc string, wt int, ws i
 
 		}
 		saveState(users, of)
-		os.Exit(0) // test
 		pNum++
 		wait(ws)
 	}
