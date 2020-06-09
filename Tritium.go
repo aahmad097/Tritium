@@ -143,7 +143,8 @@ func kerbAuth(username string, relm string, pass string, domainController string
 
 	if err != nil {
 		if strings.Contains(err.Error(), "Networking_Error: AS Exchange Error"){
-			fmt.Println("[FATAL")
+			fmt.Println("[Fatal: Networking Error - Cannot contact KDC]")
+			os.Exit(1)
 		} else if strings.Contains(err.Error(), "KRB_AP_ERR_SKEW") {
 			fmt.Println("[FATAL: Time delta between server and client too large]")
 			os.Exit(1)
