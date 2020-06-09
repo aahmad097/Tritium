@@ -142,19 +142,11 @@ func kerbAuth(username string, relm string, pass string, domainController string
 	err = cl.Login()
 
 	if err != nil {
-
-		if strings.Contains(err.Error(), "KRB_AP_ERR_SKEW") {
+		if strings.Contains(err.Error(), "Networking_Error: AS Exchange Error"){
+			fmt.Println("[FATAL")
+		} else if strings.Contains(err.Error(), "KRB_AP_ERR_SKEW") {
 			fmt.Println("[FATAL: Time delta between server and client too large]")
 			os.Exit(1)
-
-		} else if strings.Contains(err.Error(), "KDC_ERR_PREAUTH_FAILED") {
-			retString += "\t [Valid User But Invalid Password]"
-			fmt.Println(retString)
-
-		} else if strings.Contains(err.Error(), "KDC_ERR_C_PRINCIPAL_UNKNOWN") {
-
-			retString += "\t [USER DOESN'T EXIST]"
-			fmt.Println(retString)
 
 		} else if strings.Contains(err.Error(), "KRB5_REALM_UNKNOWN") {
 			
@@ -166,9 +158,18 @@ func kerbAuth(username string, relm string, pass string, domainController string
 			fmt.Println("Cannot contact any KDC for requested realm")
 			os.Exit(1)
 			
-		} else if strings.Contains(err.Error(), "KDC_ERR_CLIENT_REVOKED") {
+		}  else if strings.Contains(err.Error(), "KDC_ERR_CLIENT_REVOKED") {
 
 			retString += "\t [USER ACCOUNT LOCKED]"
+			fmt.Println(retString)
+
+		} else if strings.Contains(err.Error(), "KDC_ERR_PREAUTH_FAILED") {
+			retString += "\t [Valid User But Invalid Password]"
+			fmt.Println(retString)
+
+		} else if strings.Contains(err.Error(), "KDC_ERR_C_PRINCIPAL_UNKNOWN") {
+
+			retString += "\t [USER DOESN'T EXIST]"
 			fmt.Println(retString)
 
 		} else {
