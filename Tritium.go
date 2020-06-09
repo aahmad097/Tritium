@@ -159,7 +159,11 @@ func kerbAuth(username string, relm string, pass string, domainController string
 			fmt.Println("Cannot contact any KDC for requested realm")
 			os.Exit(1)
 			
-		}  else if strings.Contains(err.Error(), "KDC_ERR_CLIENT_REVOKED") {
+		} else if strings.Contains(err.Error(), "client does not have a username") {
+			
+			retString += "\t [Blank Username]"
+		
+		} else if strings.Contains(err.Error(), "KDC_ERR_CLIENT_REVOKED") {
 
 			retString += "\t [USER ACCOUNT LOCKED]"
 			fmt.Println(retString)
