@@ -16,13 +16,13 @@ Tritium solves all of the issues mentioned above and more. User enumeration will
 ## Usage
 
 ```
-./Tritium -h
+ ./Tritium -h
 
         ___________      .__  __  .__               
         \__    ___/______|__|/  |_|__|__ __  _____  
           |    |  \_  __ \  \   __\  |  |  \/     \ 
           |    |   |  | \/  ||  | |  |  |  /  Y Y  \
-          |____|   |__|  |__||__| |__|____/|__|_|__/ v 0.1
+          |____|   |__|  |__||__| |__|____/|__|_|__/ v 0.3
                                                                                           
 
           Author: S4R1N, alfarom256
@@ -33,6 +33,7 @@ Tritium solves all of the issues mentioned above and more. User enumeration will
 
  -d            The full domain to use (-domain targetdomain.local)
  -dc           Domain controller to authenticate against (-dc washingtondc.targetdomain.local)
+ -dcf          File of domain controllers to authenticate against 
  -u            Select single user to authenticate as (-user jsmith) 
  -uf           User file to use for password spraying (-userfile ~/home/users.txt)
  -p            Password to use for spraying (-password Welcome1)
@@ -41,7 +42,8 @@ Tritium solves all of the issues mentioned above and more. User enumeration will
 
  -help         Print this help menu
  -o            Tritium Output file (default spray.json)
- -w            Wait time between authentication attempts [Default 1] (-w 0)          
+ -w            Wait time between authentication attempts [Default 1] (-w 0)    
+ -jitter       % Jitter between authentication attempts      
  -rs           Enable recursive spraying 
  -ws           Wait time between sprays [Default 3600] (-ws 1800)
  -pwf          Password file to use for recursive 
@@ -54,7 +56,5 @@ Tritium solves all of the issues mentioned above and more. User enumeration will
 Below are some of the features being developed: 
 
 * Ability to capture ^C and save state if process was killed manually
-* Ability to randomly choose a set of DCs to auth against 
-* Jitter between authentication attempts 
 
 
