@@ -56,5 +56,6 @@ Tritium solves all of the issues mentioned above and more. User enumeration will
 Below are some of the features being developed: 
 
 * Ability to capture ^C and save state if process was killed manually
+* Other stuff ;)
 
 
