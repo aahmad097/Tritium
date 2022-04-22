@@ -19,34 +19,38 @@ const (
 	}`
 )
 
-func KerbAuth(username string, domain string, password string, dc string) ([]string, string, bool) {
+func KerbAuth(domain string, username string, password string, dc string) ([]string, string, bool) {
 
-	resp := ""
-	autherr := false
-	data := []string{domain, username, password, dc}
+	data := []string{domain, username, password, dc} // used for response handling
+	resp := ""                                       // used for response tracking
+	kerr := false                                    // used for error tracking
 
 	kcfg_str := fmt.Sprintf(KERB_FMT_STRING, domain, dc)
 	cfg, err := kconfig.NewConfigFromString(kcfg_str)
 
 	cl := kclient.NewClientWithPassword(username, domain, password, cfg, kclient.DisablePAFXFAST(true))
 	err = cl.Login()
-
 	if err != nil {
 		if strings.Contains(err.Error(), "Networking_Error: AS Exchange Error") {
 			resp = "[FATAL: Networking Error - Cannot contact KDC]"
-			autherr = true
+			kerr = true
+			goto End
 		} else if strings.Contains(err.Error(), "KRB_AP_ERR_SKEW") {
 			resp = "[FATAL: Time delta between server and client too large]"
-			autherr = true
+			kerr = true
+			goto End
 		} else if strings.Contains(err.Error(), "KRB5_REALM_UNKNOWN") {
 			resp = "[FATAL: find KDC for requested realm]"
-			autherr = true
+			kerr = true
+			goto End
 		} else if strings.Contains(err.Error(), "KRB5_KDC_UNREACH") {
 			resp = "[FATAL: Cannot contact any KDC for requested realm]"
-			autherr = true
+			kerr = true
+			goto End
 		} else if strings.Contains(err.Error(), "client does not have a username") {
 			resp = "[Error: Blank Username]"
-			autherr = true
+			kerr = true
+			goto End
 		} else if strings.Contains(err.Error(), "KDC_ERR_CLIENT_REVOKED") {
 			resp = "[USER ACCOUNT LOCKED]"
 		} else if strings.Contains(err.Error(), "KDC_ERR_PREAUTH_FAILED") {
@@ -56,8 +60,8 @@ func KerbAuth(username string, domain string, password string, dc string) ([]str
 		} else {
 			resp = "[VALID LOGIN!]"
 		}
-
 	}
 
-	return data, resp, autherr
+End:
+	return data, resp, kerr
 }

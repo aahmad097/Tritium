@@ -7,10 +7,10 @@ import (
 
 func TestKerbAuthValid(t *testing.T) {
 
-	fmt.Printf("[+] KerbAuth(user, domain, password, dc): \n")
+	fmt.Printf("[+] KerbAuth(domain,user, password, dc): \n")
 	_, resp, autherr := KerbAuth(
-		"", // Username
 		"", // Domain
+		"", // Username
 		"", // Password
 		"", // DC ADDR
 	)
