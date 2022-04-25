@@ -22,10 +22,10 @@ Tritium solves all of the issues mentioned above and more. User enumeration will
         \__    ___/______|__|/  |_|__|__ __  _____  
           |    |  \_  __ \  \   __\  |  |  \/     \ 
           |    |   |  | \/  ||  | |  |  |  /  Y Y  \
-          |____|   |__|  |__||__| |__|____/|__|_|__/ v 0.4
+          |____|   |__|  |__||__| |__|____/|__|_|__/ v 0.5
                                                                                           
 
-          Author: S4R1N, alfarom256
+          Author: aahmad097, alfarom256
  
 
 

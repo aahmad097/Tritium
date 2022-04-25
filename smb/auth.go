@@ -22,7 +22,7 @@ func SmbAuth(domain string, username string, password string, host string) ([]st
 	}
 	conn, err := net.Dial("tcp", string(host+":445"))
 	if err != nil {
-		resp = "[SMB] Error Dialing SMB Server"
+		resp = "[SMB] FATAL: Error Dialing SMB Server"
 		serr = true
 		goto End
 	} else {
