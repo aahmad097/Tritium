@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/hashicorp/go-uuid v1.0.3 // indirect
+	github.com/hirochachacha/go-smb2 v1.1.0
 	github.com/jcmturner/gofork v1.0.0 // indirect
 	github.com/ropnop/gokrb5 v7.2.0+incompatible
 	github.com/stretchr/testify v1.7.1 // indirect

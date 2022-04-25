@@ -2,6 +2,7 @@ package ldap
 
 import (
 	"fmt"
+	"strings"
 
 	lclient "gopkg.in/ldap.v2"
 )
@@ -17,7 +18,7 @@ func LdapAuth(domain, username, password, dc string) ([]string, string, bool) {
 		fmt.Sprintf("%s:%d", dc, 389),
 	)
 	if err != nil { // error dialing ldap server
-		lresp = err.Error()
+		lresp = "[LDAP] Error Dialing Ldap Server"
 		lerr = true
 		goto End
 	}
@@ -28,10 +29,14 @@ func LdapAuth(domain, username, password, dc string) ([]string, string, bool) {
 	)
 	if err != nil {
 		lresp = err.Error()
+		if strings.Contains(lresp, "Invalid Credentials") {
+			lresp = "[LDAP]: Invalid Username Or Password"
+			goto End
+		}
 		lerr = true
 		goto End
 	}
-	lresp = "[VALID LOGIN!]"
+	lresp = "[LDAP]: Valid Login!"
 
 End:
 	return input, lresp, lerr

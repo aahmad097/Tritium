@@ -32,33 +32,33 @@ func KerbAuth(domain string, username string, password string, dc string) ([]str
 	err = cl.Login()
 	if err != nil {
 		if strings.Contains(err.Error(), "Networking_Error: AS Exchange Error") {
-			resp = "[FATAL: Networking Error - Cannot contact KDC]"
+			resp = "[Kerberos] FATAL: Networking Error - Cannot contact KDC"
 			kerr = true
 			goto End
 		} else if strings.Contains(err.Error(), "KRB_AP_ERR_SKEW") {
-			resp = "[FATAL: Time delta between server and client too large]"
+			resp = "[Kerberos] FATAL: Time delta between server and client too large"
 			kerr = true
 			goto End
 		} else if strings.Contains(err.Error(), "KRB5_REALM_UNKNOWN") {
-			resp = "[FATAL: find KDC for requested realm]"
+			resp = "[Kerberos] FATAL: find KDC for requested realm"
 			kerr = true
 			goto End
 		} else if strings.Contains(err.Error(), "KRB5_KDC_UNREACH") {
-			resp = "[FATAL: Cannot contact any KDC for requested realm]"
+			resp = "[Kerberos] FATAL: Cannot contact any KDC for requested realm"
 			kerr = true
 			goto End
 		} else if strings.Contains(err.Error(), "client does not have a username") {
-			resp = "[Error: Blank Username]"
+			resp = "[Kerberos] Error: Blank Username"
 			kerr = true
 			goto End
 		} else if strings.Contains(err.Error(), "KDC_ERR_CLIENT_REVOKED") {
-			resp = "[USER ACCOUNT LOCKED]"
+			resp = "[Kerberos] User Locked Out"
 		} else if strings.Contains(err.Error(), "KDC_ERR_PREAUTH_FAILED") {
-			resp = "[Valid User But Invalid Password]"
+			resp = "[Kerberos] Valid User But Invalid Password"
 		} else if strings.Contains(err.Error(), "KDC_ERR_C_PRINCIPAL_UNKNOWN") {
-			resp = "[USER DOESN'T EXIST]"
+			resp = "[Kerberos] User doesn't Exist"
 		} else {
-			resp = "[VALID LOGIN!]"
+			resp = "[Kerberos] Valid Login!"
 		}
 	}
 
