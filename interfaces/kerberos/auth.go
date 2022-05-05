@@ -19,11 +19,10 @@ const (
 	}`
 )
 
-func KerbAuth(domain string, username string, password string, dc string) ([]string, string, bool) {
+func KerbAuth(domain string, username string, password string, dc string) ([]string, error) {
 
-	data := []string{domain, username, password, dc} // used for response handling
-	resp := ""                                       // used for response tracking
-	kerr := false                                    // used for error tracking
+	ret := []string{domain, username, password, dc} // used for response handling
+	var kerr error
 
 	kcfg_str := fmt.Sprintf(KERB_FMT_STRING, domain, dc)
 	cfg, err := kconfig.NewConfigFromString(kcfg_str)
@@ -32,36 +31,35 @@ func KerbAuth(domain string, username string, password string, dc string) ([]str
 	err = cl.Login()
 	if err != nil {
 		if strings.Contains(err.Error(), "Networking_Error: AS Exchange Error") {
-			resp = "[Kerberos] FATAL: Networking Error - Cannot contact KDC"
-			kerr = true
+			kerr = fmt.Errorf("[Kerberos] FATAL: Networking Error - Cannot contact KDC")
 			goto End
 		} else if strings.Contains(err.Error(), "KRB_AP_ERR_SKEW") {
-			resp = "[Kerberos] FATAL: Time delta between server and client too large"
-			kerr = true
+			kerr = fmt.Errorf("[Kerberos] FATAL: Time delta between server and client too large")
 			goto End
 		} else if strings.Contains(err.Error(), "KRB5_REALM_UNKNOWN") {
-			resp = "[Kerberos] FATAL: find KDC for requested realm"
-			kerr = true
+			kerr = fmt.Errorf("[Kerberos] FATAL: find KDC for requested realm")
 			goto End
 		} else if strings.Contains(err.Error(), "KRB5_KDC_UNREACH") {
-			resp = "[Kerberos] FATAL: Cannot contact any KDC for requested realm"
-			kerr = true
+			kerr = fmt.Errorf("[Kerberos] FATAL: Cannot contact any KDC for requested realm")
 			goto End
 		} else if strings.Contains(err.Error(), "client does not have a username") {
-			resp = "[Kerberos] Error: Blank Username"
-			kerr = true
+			kerr = fmt.Errorf("[Kerberos] Error: Blank Username")
 			goto End
 		} else if strings.Contains(err.Error(), "KDC_ERR_CLIENT_REVOKED") {
-			resp = "[Kerberos] User Locked Out"
+			ret = append(ret, "[Kerberos] User Locked Out")
+			goto End
 		} else if strings.Contains(err.Error(), "KDC_ERR_PREAUTH_FAILED") {
-			resp = "[Kerberos] Valid User But Invalid Password"
+			ret = append(ret, "[Kerberos] Valid User But Invalid Password")
+			goto End
 		} else if strings.Contains(err.Error(), "KDC_ERR_C_PRINCIPAL_UNKNOWN") {
-			resp = "[Kerberos] User doesn't Exist"
+			ret = append(ret, "[Kerberos] User doesn't Exist")
+			goto End
 		} else {
-			resp = "[Kerberos] Valid Login!"
+			ret = append(ret, "[Kerberos] Valid Login!")
+			goto End
 		}
 	}
 
 End:
-	return data, resp, kerr
+	return ret, kerr
 }
